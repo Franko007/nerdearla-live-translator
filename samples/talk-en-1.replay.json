@@ -1,0 +1,224 @@
+{
+  "version": 1,
+  "session_id": "talk-en-1",
+  "title": "Kubernetes at scale",
+  "source_lang": "en",
+  "target_langs": [
+    "es"
+  ],
+  "audio": "samples/talk-en-1.wav",
+  "events": [
+    {
+      "at_ms": 1500,
+      "kind": "partial",
+      "text": "Hi everyone and welcome to Nerdearla 2026."
+    },
+    {
+      "at_ms": 3600,
+      "kind": "final",
+      "text": "Hi everyone and welcome to Nerdearla 2026.",
+      "start_ms": 600,
+      "end_ms": 3600
+    },
+    {
+      "at_ms": 4700,
+      "kind": "partial",
+      "text": "Today we're going to talk about running Kubernetes in production."
+    },
+    {
+      "at_ms": 7600,
+      "kind": "final",
+      "text": "Today we're going to talk about running Kubernetes in production.",
+      "start_ms": 3800,
+      "end_ms": 7600
+    },
+    {
+      "at_ms": 9100,
+      "kind": "partial",
+      "text": "The first question is simple. Do you monitor your nodes?"
+    },
+    {
+      "at_ms": 11800,
+      "kind": "final",
+      "text": "The first question is simple. Do you monitor your nodes?",
+      "start_ms": 8200,
+      "end_ms": 11800
+    },
+    {
+      "at_ms": 13300,
+      "kind": "partial",
+      "text": "Most teams start with Prometheus and Grafana."
+    },
+    {
+      "at_ms": 16400,
+      "kind": "final",
+      "text": "Most teams start with Prometheus and Grafana.",
+      "start_ms": 12400,
+      "end_ms": 16400
+    },
+    {
+      "at_ms": 18100,
+      "kind": "partial",
+      "text": "But observability is more than dashboards."
+    },
+    {
+      "at_ms": 21000,
+      "kind": "final",
+      "text": "But observability is more than dashboards.",
+      "start_ms": 17200,
+      "end_ms": 21000
+    },
+    {
+      "at_ms": 23300,
+      "kind": "partial",
+      "text": "OpenTelemetry gives you traces, metrics and logs from one SDK."
+    },
+    {
+      "at_ms": 27200,
+      "kind": "final",
+      "text": "OpenTelemetry gives you traces, metrics and logs from one SDK.",
+      "start_ms": 22400,
+      "end_ms": 27200
+    },
+    {
+      "at_ms": 28900,
+      "kind": "partial",
+      "text": "Health checks decide whether your instance gets traffic."
+    },
+    {
+      "at_ms": 32000,
+      "kind": "final",
+      "text": "Health checks decide whether your instance gets traffic.",
+      "start_ms": 28000,
+      "end_ms": 32000
+    },
+    {
+      "at_ms": 34100,
+      "kind": "partial",
+      "text": "Ready and live probes have very different jobs."
+    },
+    {
+      "at_ms": 37400,
+      "kind": "final",
+      "text": "Ready and live probes have very different jobs.",
+      "start_ms": 33200,
+      "end_ms": 37400
+    },
+    {
+      "at_ms": 39100,
+      "kind": "partial",
+      "text": "And never forget the glossary. Kubernetes keeps its name."
+    },
+    {
+      "at_ms": 42400,
+      "kind": "final",
+      "text": "And never forget the glossary. Kubernetes keeps its name.",
+      "start_ms": 38200,
+      "end_ms": 42400
+    },
+    {
+      "at_ms": 44500,
+      "kind": "partial",
+      "text": "Thanks for watching. See you in the next talk."
+    },
+    {
+      "at_ms": 48800,
+      "kind": "final",
+      "text": "Thanks for watching. See you in the next talk.",
+      "start_ms": 43600,
+      "end_ms": 48800
+    }
+  ],
+  "segments": [
+    {
+      "seq": 1,
+      "start_ms": 600,
+      "end_ms": 3600,
+      "source_text": "Hi everyone and welcome to Nerdearla 2026.",
+      "translations": {
+        "es": "Hola a todos y bienvenidos a Nerdearla 2026."
+      }
+    },
+    {
+      "seq": 2,
+      "start_ms": 3800,
+      "end_ms": 7600,
+      "source_text": "Today we're going to talk about running Kubernetes in production.",
+      "translations": {
+        "es": "Hoy vamos a hablar de correr Kubernetes en producción."
+      }
+    },
+    {
+      "seq": 3,
+      "start_ms": 8200,
+      "end_ms": 11800,
+      "source_text": "The first question is simple. Do you monitor your nodes?",
+      "translations": {
+        "es": "La primera pregunta es simple. ¿Monitorean sus nodos?"
+      }
+    },
+    {
+      "seq": 4,
+      "start_ms": 12400,
+      "end_ms": 16400,
+      "source_text": "Most teams start with Prometheus and Grafana.",
+      "translations": {
+        "es": "La mayoría de los equipos empieza con Prometheus y Grafana."
+      }
+    },
+    {
+      "seq": 5,
+      "start_ms": 17200,
+      "end_ms": 21000,
+      "source_text": "But observability is more than dashboards.",
+      "translations": {
+        "es": "Pero la observabilidad es más que dashboards."
+      }
+    },
+    {
+      "seq": 6,
+      "start_ms": 22400,
+      "end_ms": 27200,
+      "source_text": "OpenTelemetry gives you traces, metrics and logs from one SDK.",
+      "translations": {
+        "es": "OpenTelemetry te da traces, métricas y logs desde un único SDK."
+      }
+    },
+    {
+      "seq": 7,
+      "start_ms": 28000,
+      "end_ms": 32000,
+      "source_text": "Health checks decide whether your instance gets traffic.",
+      "translations": {
+        "es": "Los health checks deciden si tu instancia recibe tráfico."
+      }
+    },
+    {
+      "seq": 8,
+      "start_ms": 33200,
+      "end_ms": 37400,
+      "source_text": "Ready and live probes have very different jobs.",
+      "translations": {
+        "es": "Las sondas ready y live tienen trabajos muy distintos."
+      }
+    },
+    {
+      "seq": 9,
+      "start_ms": 38200,
+      "end_ms": 42400,
+      "source_text": "And never forget the glossary. Kubernetes keeps its name.",
+      "translations": {
+        "es": "Y nunca olviden el glosario. Kubernetes conserva su nombre."
+      }
+    },
+    {
+      "seq": 10,
+      "start_ms": 43600,
+      "end_ms": 48800,
+      "source_text": "Thanks for watching. See you in the next talk.",
+      "translations": {
+        "es": "Gracias por mirar. Nos vemos en la próxima charla."
+      }
+    }
+  ]
+}

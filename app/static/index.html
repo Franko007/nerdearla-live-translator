@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Nerdearla Live Translator</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">◉</span>
+      <div>
+        <h1>Nerdearla Live Translator</h1>
+        <p class="subtitle">Captioning y traducción simultánea open source</p>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span id="mode-badge" class="badge badge-live">● LIVE — Gemini</span>
+      <span class="desc" id="provider-desc"></span>
+    </div>
+  </header>
+
+  <main id="monitors" class="monitors">
+    <div class="empty">Cargando sesiones…</div>
+  </main>
+
+  <footer class="foot">
+    <span id="foot-status"></span>
+    <a href="/admin">Admin</a>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

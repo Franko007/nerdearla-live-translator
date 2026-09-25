@@ -1,0 +1,21 @@
+# --- Python / uv ---
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# --- Entorno ---
+.env
+*.env
+.env.local
+
+# --- Salidas de spike / grabación ---
+spike_out/
+
+# --- IDEs / sistema ---
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

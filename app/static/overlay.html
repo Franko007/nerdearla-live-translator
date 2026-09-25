@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Overlay</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body class="overlay">
+  <div id="overlay-text" class="ghost">…</div>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const sid = params.get("sid") || location.pathname.split("/").filter(Boolean).pop();
+    const lang = params.get("lang") || "es";
+    const el = document.getElementById("overlay-text");
+    let partial = "";
+
+    const src = new EventSource(`/stream/${encodeURIComponent(sid)}?lang=${encodeURIComponent(lang)}`);
+    src.addEventListener("message", (e) => {
+      let d;
+      try { d = JSON.parse(e.data); } catch { return; }
+      if (d.kind === "translation") {
+        partial = "";
+        el.textContent = d.text;
+        el.classList.remove("ghost");
+      } else if (d.kind === "final" && lang === d.lang) {
+        el.textContent = d.text;
+      } else if (d.kind === "partial") {
+        partial = d.text;
+        el.textContent = d.text;
+        el.classList.add("ghost");
+      }
+    });
+    src.onerror = () => { el.textContent = "… reconectando …"; };
+  </script>
+</body>
+</html>

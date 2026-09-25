@@ -1,0 +1,203 @@
+{
+  "version": 1,
+  "session_id": "talk-en-2",
+  "title": "WebAssembly beyond the browser",
+  "source_lang": "en",
+  "target_langs": [
+    "es"
+  ],
+  "audio": "samples/talk-en-2.wav",
+  "events": [
+    {
+      "at_ms": 1600,
+      "kind": "partial",
+      "text": "Welcome back everybody. Great to see you all here."
+    },
+    {
+      "at_ms": 3500,
+      "kind": "final",
+      "text": "Welcome back everybody. Great to see you all here.",
+      "start_ms": 700,
+      "end_ms": 3500
+    },
+    {
+      "at_ms": 4900,
+      "kind": "partial",
+      "text": "Today I want to talk about WebAssembly outside the browser."
+    },
+    {
+      "at_ms": 7800,
+      "kind": "final",
+      "text": "Today I want to talk about WebAssembly outside the browser.",
+      "start_ms": 4000,
+      "end_ms": 7800
+    },
+    {
+      "at_ms": 9400,
+      "kind": "partial",
+      "text": "It runs in edge runtimes, in databases, even in kernels."
+    },
+    {
+      "at_ms": 12500,
+      "kind": "final",
+      "text": "It runs in edge runtimes, in databases, even in kernels.",
+      "start_ms": 8500,
+      "end_ms": 12500
+    },
+    {
+      "at_ms": 14100,
+      "kind": "partial",
+      "text": "The key idea is sandboxing untrusted code safely."
+    },
+    {
+      "at_ms": 17000,
+      "kind": "final",
+      "text": "The key idea is sandboxing untrusted code safely.",
+      "start_ms": 13200,
+      "end_ms": 17000
+    },
+    {
+      "at_ms": 18700,
+      "kind": "partial",
+      "text": "You get near-native performance with portable binaries."
+    },
+    {
+      "at_ms": 22400,
+      "kind": "final",
+      "text": "You get near-native performance with portable binaries.",
+      "start_ms": 17800,
+      "end_ms": 22400
+    },
+    {
+      "at_ms": 24100,
+      "kind": "partial",
+      "text": "At the module level, you don't compile to a machine."
+    },
+    {
+      "at_ms": 27600,
+      "kind": "final",
+      "text": "At the module level, you don't compile to a machine.",
+      "start_ms": 23200,
+      "end_ms": 27600
+    },
+    {
+      "at_ms": 29300,
+      "kind": "partial",
+      "text": "You compile once and run anywhere."
+    },
+    {
+      "at_ms": 32000,
+      "kind": "final",
+      "text": "You compile once and run anywhere.",
+      "start_ms": 28400,
+      "end_ms": 32000
+    },
+    {
+      "at_ms": 34100,
+      "kind": "partial",
+      "text": "Choose it when you need isolation but not a container."
+    },
+    {
+      "at_ms": 38000,
+      "kind": "final",
+      "text": "Choose it when you need isolation but not a container.",
+      "start_ms": 33200,
+      "end_ms": 38000
+    },
+    {
+      "at_ms": 40100,
+      "kind": "partial",
+      "text": "Thanks a lot. I'll take questions over lunch."
+    },
+    {
+      "at_ms": 43800,
+      "kind": "final",
+      "text": "Thanks a lot. I'll take questions over lunch.",
+      "start_ms": 39200,
+      "end_ms": 43800
+    }
+  ],
+  "segments": [
+    {
+      "seq": 1,
+      "start_ms": 700,
+      "end_ms": 3500,
+      "source_text": "Welcome back everybody. Great to see you all here.",
+      "translations": {
+        "es": "Bienvenidos de nuevo. Qué gusto verlos a todos acá."
+      }
+    },
+    {
+      "seq": 2,
+      "start_ms": 4000,
+      "end_ms": 7800,
+      "source_text": "Today I want to talk about WebAssembly outside the browser.",
+      "translations": {
+        "es": "Hoy quiero hablar de WebAssembly fuera del navegador."
+      }
+    },
+    {
+      "seq": 3,
+      "start_ms": 8500,
+      "end_ms": 12500,
+      "source_text": "It runs in edge runtimes, in databases, even in kernels.",
+      "translations": {
+        "es": "Corre en runtimes de edge, en bases de datos, incluso en kernels."
+      }
+    },
+    {
+      "seq": 4,
+      "start_ms": 13200,
+      "end_ms": 17000,
+      "source_text": "The key idea is sandboxing untrusted code safely.",
+      "translations": {
+        "es": "La idea clave es aislar código no confiable de forma segura."
+      }
+    },
+    {
+      "seq": 5,
+      "start_ms": 17800,
+      "end_ms": 22400,
+      "source_text": "You get near-native performance with portable binaries.",
+      "translations": {
+        "es": "Obtienes rendimiento casi nativo con binarios portables."
+      }
+    },
+    {
+      "seq": 6,
+      "start_ms": 23200,
+      "end_ms": 27600,
+      "source_text": "At the module level, you don't compile to a machine.",
+      "translations": {
+        "es": "A nivel de módulo, no compilas a una máquina."
+      }
+    },
+    {
+      "seq": 7,
+      "start_ms": 28400,
+      "end_ms": 32000,
+      "source_text": "You compile once and run anywhere.",
+      "translations": {
+        "es": "Compilas una vez y corre en cualquier lado."
+      }
+    },
+    {
+      "seq": 8,
+      "start_ms": 33200,
+      "end_ms": 38000,
+      "source_text": "Choose it when you need isolation but not a container.",
+      "translations": {
+        "es": "Elegilo cuando necesites aislamiento pero no un contenedor."
+      }
+    },
+    {
+      "seq": 9,
+      "start_ms": 39200,
+      "end_ms": 43800,
+      "source_text": "Thanks a lot. I'll take questions over lunch.",
+      "translations": {
+        "es": "Muchas gracias. Respondo preguntas durante el almuerzo."
+      }
+    }
+  ]
+}

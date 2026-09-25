@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin — Nerdearla Live Translator</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">◉</span>
+      <div>
+        <h1>Admin</h1>
+        <p class="subtitle">Nerdearla Live Translator · operación</p>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span id="mode-badge" class="badge badge-demo">DEMO</span>
+    </div>
+  </header>
+
+  <div class="admin-title">
+    <h2>Sesiones</h2>
+    <p>Las métricas son agregados por sesión (p50/p95). pipeline latency es un proxy:
+       publicado menos el punto de audio que lo originó.</p>
+  </div>
+
+  <div class="panel-table">
+    <table class="admin" id="tbl">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Título</th>
+          <th>Estado</th>
+          <th>Modo</th>
+          <th>Errores</th>
+          <th>Reconex.</th>
+          <th>Segments</th>
+          <th class="num">Audio s</th>
+          <th class="num">Trad. calls</th>
+          <th class="num">p50 lat</th>
+          <th class="num">p95 lat</th>
+          <th class="num">p50 trad</th>
+          <th class="num">p95 trad</th>
+          <th class="num">p50 pipeline</th>
+          <th class="num">p95 pipeline</th>
+          <th>Error</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <footer class="foot">
+    <span id="foot-status"></span>
+    <a href="/">Volver</a>
+  </footer>
+
+  <script>
+    const tbody = document.querySelector("#tbl tbody");
+    const badgeEl = document.getElementById("mode-badge");
+
+    function n(v) { return v == null ? '<span class="nan">—</span>' : Math.round(v); }
+    function cell(v) { return `<td class="num">${n(v)}</td>`; }
+
+    async function tick() {
+      try {
+        const res = await fetch("/api/sessions");
+        const p = await res.json();
+        badgeEl.textContent = p.mode === "live" ? "● LIVE — Gemini" : "● DEMO — Replay";
+        badgeEl.className = p.mode === "live" ? "badge badge-live" : "badge badge-demo";
+        tbody.innerHTML = "";
+        for (const s of p.sessions) {
+          const m = s.metrics || {};
+          const p50 = m.p50_ms || {}, p95 = m.p95_ms || {};
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${escapeHtml(s.id)}</td>
+            <td>${escapeHtml(s.title)}</td>
+            <td>${escapeHtml(s.status)}</td>
+            <td>${s.mode}</td>
+            <td class="num">${s.metrics.errors}</td>
+            <td class="num">${s.metrics.reconnections}</td>
+            <td class="num">${s.segments}</td>
+            ${cell(m.audio_seconds)}
+            ${cell(m.translation_calls)}
+            ${cell(p50.transcription)}
+            ${cell(p95.transcription)}
+            ${cell(p50.translation)}
+            ${cell(p95.translation)}
+            ${cell(p50.pipeline)}
+            ${cell(p95.pipeline)}
+            <td>${escapeHtml(s.error || "")}</td>`;
+          tbody.appendChild(tr);
+        }
+        document.getElementById("foot-status").textContent =
+          `${p.sessions.length} sesión(es) · actualizado ${new Date().toLocaleTimeString()}`;
+      } catch (e) {
+        document.getElementById("foot-status").textContent = "API no disponible: " + e.message;
+      }
+    }
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+      }[c]));
+    }
+    tick();
+    setInterval(tick, 2500);
+  </script>
+</body>
+</html>
