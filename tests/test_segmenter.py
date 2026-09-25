@@ -64,9 +64,9 @@ async def test_target_equal_to_source_is_skipped():
 
 async def test_multiple_times_in_successive_segments(fake_translator):
     seg = Segmenter("s1", "en", ["es"], fake_translator, Metrics())
-    await seg.feed(final("First.", 1), 100)
-    await seg.feed(final("Second.", 2), 200)
-    await seg.feed(final("Third.", 3), 300)
+    await seg.feed(final("First.", 1, start_ms=100), 100)
+    await seg.feed(final("Second.", 2, start_ms=200), 200)
+    await seg.feed(final("Third.", 3, start_ms=300), 300)
     assert len(seg.segments) == 3
     assert [s.source_text for s in seg.segments] == ["First.", "Second.", "Third."]
     assert seg.segments[0].start_ms == 100

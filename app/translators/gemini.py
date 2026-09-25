@@ -6,6 +6,9 @@ los términos técnicos tal como están escritos.
 from __future__ import annotations
 
 
+from app.transcribers.gemini import _call_with_retry
+
+
 class GeminiTranslator:
     def __init__(self, model: str, glossary: list[str], *, client) -> None:
         self.model = model
@@ -26,10 +29,12 @@ class GeminiTranslator:
             system += " Keep these terms exactly as written: " + ", ".join(self.glossary[:100]) + "."
 
         self.calls += 1
-        resp = await self._client.aio.models.generate_content(
-            model=self.model,
-            contents=source_text,
-            config=types.GenerateContentConfig(system_instruction=system),
+        resp = await _call_with_retry(
+            lambda: self._client.aio.models.generate_content(
+                model=self.model,
+                contents=source_text,
+                config=types.GenerateContentConfig(system_instruction=system),
+            )
         )
         um = getattr(resp, "usage_metadata", None)
         self.usage_total["in"] += getattr(um, "prompt_token_count", 0) or 0

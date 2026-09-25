@@ -5,6 +5,7 @@ Endpoints:
   /admin                        Panel de operación
   /overlay/{session_id}?lang=   Overlay para OBS Browser Source
   /stream/{session_id}?lang=    SSE de subtítulos (Last-Event-ID soportado)
+  /ws/audio/{session_id}        Captura del mic del navegador (PCM 16k binario)
   /api/sessions                 Crear/listar sesiones
   /export/{session_id}.{fmt}    SRT / VTT / TXT
   /healthz                      Health check
@@ -16,17 +17,19 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from app.audio.websource import WebSource
 from app.config import Settings, get_settings
 from app.export import render_srt, render_txt, render_vtt
 from app.glossary import load_glossary
 from app.hub import Hub
 from app.session_manager import SessionManager
 from app.transcribers.gemini import build_gemini_client
+from app.youtube import resolve_source
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 log = logging.getLogger("main")
@@ -35,9 +38,24 @@ STATIC_DIR = Path(__file__).parent / "static"
 EXPORT_RENDER = {"srt": render_srt, "vtt": render_vtt, "txt": render_txt}
 
 
+class CreateSessionBody(BaseModel):
+    source: str
+    session_id: str | None = None
+    title: str = ""
+    source_lang: str | None = None
+    target_langs: list[str] | None = None
+    auto_start: bool = True
+
+
+class ResolveSourceBody(BaseModel):
+    url: str
+
+
 def create_app(settings: Settings | None = None, *, _entrypoint: bool = False) -> FastAPI:
     settings = settings or get_settings()
     hub = Hub()
+    # Una única captura activa por sesión (mic de navegador -> WebSocket).
+    active_captures: dict[str, WebSocket] = {}
 
     def _build_client():
         if settings.provider.lower() != "gemini":
@@ -54,6 +72,18 @@ def create_app(settings: Settings | None = None, *, _entrypoint: bool = False) -
                 await s.start()
             if sessions:
                 log.info("Modo DEMO - sesiones creadas: %s", ", ".join(s.id for s in sessions))
+        elif settings.nerdearla_stream_url:
+            try:
+                session = await manager.create(
+                    source=settings.nerdearla_stream_url,
+                    session_id="nerdearla-live",
+                    title="Nerdearla en vivo",
+                    source_lang=settings.source_lang_default,
+                    auto_start=True,
+                )
+                log.info("Modo LIVE - sesión desde stream: %s", session.id)
+            except Exception as e:  # noqa: BLE001
+                log.error("No se pudo iniciar la sesión del stream: %s", e)
         yield
         for s in manager.all():
             await s.stop()
@@ -77,14 +107,6 @@ def create_app(settings: Settings | None = None, *, _entrypoint: bool = False) -
             "mode": "live" if not settings.is_replay else "demo",
             "sessions": manager.summaries(),
         }
-
-    class CreateSessionBody(BaseModel):
-        source: str
-        session_id: str | None = None
-        title: str = ""
-        source_lang: str | None = None
-        target_langs: list[str] | None = None
-        auto_start: bool = True
 
     @app.post("/api/sessions")
     async def create_session(body: CreateSessionBody):
@@ -112,9 +134,95 @@ def create_app(settings: Settings | None = None, *, _entrypoint: bool = False) -
 
     @app.post("/api/sessions/{session_id}/stop")
     async def stop_session(session_id: str):
+        await _close_capture(session_id)
         if not await manager.stop(session_id):
             raise HTTPException(status_code=404, detail="Sesión no encontrada.")
         return {"stopped": session_id}
+
+    @app.delete("/api/sessions/{session_id}")
+    async def delete_session(session_id: str):
+        await _close_capture(session_id)
+        if not await manager.stop(session_id):
+            raise HTTPException(status_code=404, detail="Sesión no encontrada.")
+        if not await manager.remove(session_id):
+            raise HTTPException(status_code=404, detail="Sesión no encontrada.")
+        return {"deleted": session_id}
+
+    async def _close_capture(session_id: str) -> None:
+        ws = active_captures.pop(session_id, None)
+        if ws is not None:
+            try:
+                await ws.close(code=1000, reason="sesión detenida por el operador")
+            except Exception:  # noqa: BLE001
+                pass
+
+    @app.websocket("/ws/audio/{session_id}")
+    async def ws_audio(websocket: WebSocket, session_id: str):
+        """Pcm s16le 16 kHz mono desde el browser; crea la sesión en un solo paso.
+
+        Cierra la sesión automáticamente cuando se corta el mic del navegador.
+        Params de query: source_lang, target_lang (opcional; sin él la sesión
+        queda en solo transcripción), title (opcional).
+        """
+        params = websocket.query_params
+        source_lang = params.get("source_lang") or settings.source_lang_default
+        target_lang = params.get("target_lang")
+        title = (params.get("title") or session_id)[:30]
+
+        await websocket.accept()
+        stream = WebSource()
+        try:
+            if session_id in active_captures:
+                await websocket.close(code=1008, reason="ya hay una captura activa en esta sesión")
+                return
+            session = manager.get(session_id)
+            if session is not None:
+                if session.status in ("starting", "running"):
+                    await websocket.close(code=1008, reason="la sesión ya está corriendo")
+                    return
+                session.attach_stream(stream)
+            else:
+                try:
+                    session = await manager.create(
+                        source=f"mic://{session_id}",
+                        session_id=session_id,
+                        title=title,
+                        source_lang=source_lang,
+                        target_langs=[target_lang] if target_lang else [source_lang],
+                        auto_start=False,
+                    )
+                except (ValueError, RuntimeError) as e:
+                    await websocket.close(code=1008, reason=f"no se pudo crear la sesión: {e}")
+                    return
+                session.attach_stream(stream)
+
+            active_captures[session_id] = websocket
+            try:
+                await session.start()
+                while True:
+                    try:
+                        message = await websocket.receive()
+                    except (WebSocketDisconnect, Exception):  # noqa: BLE001
+                        break
+                    if message["type"] == "websocket.disconnect":
+                        break
+                    data = message.get("bytes")
+                    if data:
+                        stream.feed(data)
+            finally:
+                active_captures.pop(session_id, None)
+        finally:
+            stream.close()
+
+    @app.post("/api/resolve-source")
+    async def resolve_source_endpoint(body: ResolveSourceBody):
+        """Resuelve una URL de YouTube (u otra) a la URL de audio directa.
+
+        Si es YouTube, usa yt-dlp. Si no, devuelve la URL tal cual.
+        """
+        resolved, warning = await resolve_source(body.url)
+        return {"original": body.url, "resolved": resolved, "warning": warning}
+
 
     # ------------------------------------------------------------- SSE
     @app.get("/stream/{session_id}")
@@ -199,7 +307,7 @@ def create_app(settings: Settings | None = None, *, _entrypoint: bool = False) -
         return FileResponse(STATIC_DIR / "admin.html")
 
     @app.get("/overlay/{session_id}")
-    async def overlay(_session_id: str):
+    async def overlay(session_id: str):
         return FileResponse(STATIC_DIR / "overlay.html")
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

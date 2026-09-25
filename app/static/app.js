@@ -198,8 +198,21 @@ function updateFoot(mon, s) {
   el.querySelector(".ms").textContent = `pipeline p50: ${fmtLat(pipeline)}`;
   el.querySelector(".segments").textContent = `segmentos: ${s.segments}`;
   const pstatus = el.querySelector(".pstatus");
-  pstatus.textContent = `estado: ${s.status}`;
-  pstatus.className = "pstatus " + (s.status === "running" ? "ok" : s.status === "error" ? "error" : "stop");
+  let statusTxt, stCls;
+  if (s.status === "error") {
+    stCls = "error";
+    statusTxt = /429|RESOURCE_EXHAUSTED/.test(s.error || "")
+      ? "⚠ cuota de IA (429) — sesión detenida"
+      : "estado: error";
+  } else if (s.status === "running" && (s.segments || 0) === 0) {
+    stCls = "ok";
+    statusTxt = "transcribiendo… sin subtítulos todavía";
+  } else {
+    stCls = s.status === "running" ? "ok" : "stop";
+    statusTxt = `estado: ${s.status}`;
+  }
+  pstatus.textContent = statusTxt;
+  pstatus.className = "pstatus " + stCls;
 }
 
 function fmtLat(v) {

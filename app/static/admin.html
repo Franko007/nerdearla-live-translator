@@ -5,6 +5,133 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Admin — Nerdearla Live Translator</title>
   <link rel="stylesheet" href="/static/style.css" />
+  <script src="/static/qrcode-generator.min.js"></script>
+  <style>
+    /* -------- formulario nueva sesión -------- */
+    .new-session-card {
+      margin: 22px 28px 0;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .new-session-card summary {
+      padding: 14px 20px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--panel-2);
+    }
+    .new-session-card summary:hover { background: #1d2b40; }
+    .new-session-card summary::marker { color: var(--accent); }
+    .form-body {
+      padding: 18px 20px 20px;
+      display: grid;
+      gap: 12px;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+    .field input, .field select {
+      background: #0d1420;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 13.5px;
+      padding: 9px 12px;
+      outline: none;
+      width: 100%;
+      transition: border-color .15s;
+    }
+    .field input:focus, .field select:focus { border-color: var(--accent); }
+    .field input::placeholder { color: #4a5a70; }
+    .field-full { grid-column: 1 / -1; }
+    .resolve-row {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+    }
+    .resolve-row .field { flex: 1; }
+    .btn {
+      padding: 9px 18px;
+      border-radius: 8px;
+      border: none;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity .15s;
+      white-space: nowrap;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #06222e; }
+    .btn-secondary { background: #233450; color: var(--text); border: 1px solid var(--border); }
+    .btn-danger { background: rgba(255,77,109,.15); color: var(--err); border: 1px solid rgba(255,77,109,.4); font-size: 12px; padding: 5px 10px; border-radius: 6px; }
+    .btn-danger:hover { background: rgba(255,77,109,.3); }
+    .form-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .form-msg {
+      font-size: 12.5px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      display: none;
+    }
+    .form-msg.ok { display: block; background: rgba(49,208,124,.1); color: var(--ok); border: 1px solid rgba(49,208,124,.3); }
+    .form-msg.err { display: block; background: rgba(255,77,109,.1); color: var(--err); border: 1px solid rgba(255,77,109,.3); }
+    .form-msg.warn { display: block; background: rgba(255,176,32,.1); color: var(--warn); border: 1px solid rgba(255,176,32,.3); }
+    .resolve-badge {
+      font-size: 11px;
+      color: var(--muted);
+      max-width: 100%;
+      word-break: break-all;
+    }
+    .resolve-badge.ok { color: var(--ok); }
+    /* -------- captura del mic del navegador -------- */
+    .capture-sep {
+      display: flex; align-items: center; gap: 10px;
+      color: var(--muted); font-size: 12px; margin: 6px 0 2px;
+    }
+    .capture-sep::before, .capture-sep::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+    .btn-live { background: #0f766e; color: #eafff7; border: 1px solid #13a89b; }
+    .btn-live.recording { background: #b31230; border-color: #ff4d6d; color: #fff; }
+    .vu-wrap { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+    .vu { width: 130px; height: 8px; background: #0d1420; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+    .vu > i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg, #2dd483, #ffb020 70%, #ff4d6d); transition: width .08s; }
+    .cap-state { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--warn); }
+    .cap-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #ff4d6d; animation: pulse 1.1s ease-in-out infinite; }
+    @keyframes pulse { 50% { opacity: .2; } }
+    /* -------- modal de QR -------- */
+    .qr-overlay { position: fixed; inset: 0; background: rgba(4,8,14,.74); display: none; align-items: center; justify-content: center; z-index: 50; }
+    .qr-overlay.open { display: flex; }
+    .qr-card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 20px 24px; text-align: center; max-width: 440px; }
+    .qr-card h3 { margin: 0 0 4px; font-size: 15px; }
+    .qr-card svg { margin: 12px auto; display: block; }
+    .qr-url { font-size: 11.5px; color: var(--muted); word-break: break-all; margin-bottom: 12px; }
+    .qr-actions { display: flex; gap: 8px; justify-content: center; }
+    /* -------- tabla mejorada -------- */
+    table.admin td a { color: var(--accent); text-decoration: none; font-size: 11.5px; }
+    .pstatus.ok { color: var(--ok); }
+    .pstatus.error { color: var(--err); }
+    .pstatus.stop { color: var(--warn); }
+    .spinner {
+      display: inline-block;
+      width: 12px; height: 12px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
 </head>
 <body>
   <header class="topbar">
@@ -20,8 +147,97 @@
     </div>
   </header>
 
-  <div class="admin-title">
-    <h2>Sesiones</h2>
+  <!-- =========== Nueva sesión =========== -->
+  <details class="new-session-card" id="new-session-details">
+    <summary>＋ Nueva sesión</summary>
+    <div class="form-body">
+      <div class="field">
+        <label>Fuente</label>
+        <select id="f-kind" onchange="updateKind()">
+          <option value="youtube" selected>YouTube (video o live)</option>
+          <option value="url">URL de stream (HLS / directo)</option>
+          <option value="file">Archivo de audio (samples/*.wav)</option>
+          <option value="mic">Micrófono en vivo (sin URL)</option>
+        </select>
+      </div>
+      <div class="resolve-row" id="source-row">
+        <div class="field field-full">
+          <label id="f-source-label">URL del video/live</label>
+          <input id="f-source" type="text"
+            placeholder="https://www.youtube.com/watch?v=…" />
+        </div>
+        <button class="btn btn-secondary" id="btn-resolve" onclick="resolveSource()" title="Resolver URL de YouTube con yt-dlp">
+          Resolver
+        </button>
+      </div>
+      <div id="resolve-info" class="resolve-badge" style="display:none"></div>
+      <p id="f-kind-hint" style="margin:0; font-size:11.5px; color:var(--muted)"></p>
+
+      <div class="form-row">
+        <div class="field">
+          <label>Título (opcional, máx 30)</label>
+          <input id="f-title" type="text" maxlength="30" placeholder="Ej: Charla principal · YouTube Demo" />
+        </div>
+        <div class="field">
+          <label>ID de sesión (opcional, máx 30)</label>
+          <input id="f-sid" type="text" maxlength="30" placeholder="auto generado" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="field">
+          <label>Idioma origen</label>
+          <select id="f-src-lang">
+            <option value="en" selected>en — English</option>
+            <option value="es">es — Español</option>
+            <option value="pt">pt — Português</option>
+            <option value="de">de — Deutsch</option>
+            <option value="fr">fr — Français</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Idioma destino</label>
+          <select id="f-tgt-lang">
+            <option value="es" selected>es — Español</option>
+            <option value="en">en — English</option>
+            <option value="pt">pt — Português</option>
+            <option value="de">de — Deutsch</option>
+            <option value="fr">fr — Français</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn btn-primary" id="btn-create" onclick="createSession()">
+          ▶ Crear sesión
+        </button>
+        <div id="form-msg" class="form-msg"></div>
+      </div>
+
+      <div class="capture-sep">o capturar el micrófono en vivo</div>
+      <div class="form-actions">
+        <button class="btn btn-live" id="btn-capture" onclick="toggleCapture()">
+          🎙 Capturar micrófono
+        </button>
+        <span id="capture-state" class="cap-state" style="display:none">
+          <span class="cap-dot"></span>
+          <span id="capture-label"></span>
+        </span>
+        <span class="vu-wrap">
+          <span class="vu"><i id="vu-bar"></i></span>
+          <span id="vu-text">–∞ dB</span>
+        </span>
+      </div>
+      <p style="margin:0; font-size:11.5px; color:var(--muted)">
+        Usa los idiomas de arriba y captura la placa con el mic de ESTE navegador.
+        La sesión se crea en un paso y se corta sola a los segundos de caerse el audio.
+      </p>
+    </div>
+  </details>
+
+  <!-- =========== Tabla de sesiones =========== -->
+  <div class="admin-title" style="margin-top:22px">
+    <h2>Sesiones activas</h2>
     <p>Las métricas son agregados por sesión (p50/p95). pipeline latency es un proxy:
        publicado menos el punto de audio que lo originó.</p>
   </div>
@@ -46,6 +262,7 @@
           <th class="num">p50 pipeline</th>
           <th class="num">p95 pipeline</th>
           <th>Error</th>
+          <th>Acciones</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -57,28 +274,364 @@
     <a href="/">Volver</a>
   </footer>
 
+  <!-- =========== Modal QR para el público =========== -->
+  <div class="qr-overlay" id="qr-overlay" onclick="if(event.target===this)closeQR()">
+    <div class="qr-card">
+      <h3>Subtítulos para el público</h3>
+      <p style="margin:0; font-size:12px; color:var(--muted)">Escaneá desde el celular estando en la misma red.</p>
+      <div id="qr-svg"></div>
+      <div class="qr-url" id="qr-url"></div>
+      <div class="qr-actions">
+        <button class="btn btn-secondary" onclick="copyQR()">Copiar URL</button>
+        <button class="btn btn-primary" onclick="closeQR()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const tbody = document.querySelector("#tbl tbody");
     const badgeEl = document.getElementById("mode-badge");
+    let resolvedSource = null; // URL resuelta por yt-dlp
+    let currentMode = "demo"; // última vista de /api/sessions (live | demo)
 
+    // ---------------------------------------------------------------- helpers
     function n(v) { return v == null ? '<span class="nan">—</span>' : Math.round(v); }
     function cell(v) { return `<td class="num">${n(v)}</td>`; }
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+      }[c]));
+    }
+    function showMsg(text, type) {
+      const el = document.getElementById("form-msg");
+      el.textContent = text;
+      el.className = "form-msg " + type;
+    }
 
+    // ---------------------------------------------------------------- fuente
+    const KIND = {
+      youtube: {
+        label: "URL del video/live",
+        ph: "https://www.youtube.com/watch?v=…",
+        hint: "Se resuelve solo con yt-dlp al crear. Un video termina solo; un live queda corriendo hasta Stop.",
+      },
+      url: {
+        label: "URL del stream (HLS / directo)",
+        ph: "https://…/playlist.m3u8",
+        hint: "URL directa, normalmente HLS (.m3u8) o la directa que devolvió yt-dlp.",
+      },
+      file: {
+        label: "Archivo de audio en el server",
+        ph: "samples/talk-en-1.wav",
+        hint: "Ruta local al audio, p. ej. samples/talk-en-1.wav. Se procesa una sola vez.",
+      },
+      mic: {
+        label: "Micrófono en vivo",
+        ph: "",
+        hint: "Sin URL: apretá 🎙 Capturar micrófono abajo. Se crea la sesión sola y se corta al dejar de hablar.",
+      },
+    };
+    function updateKind() {
+      const kind = document.getElementById("f-kind").value;
+      const cfg = KIND[kind];
+      const isMic = kind === "mic";
+      document.getElementById("f-source-label").textContent = cfg.label;
+      document.getElementById("f-source").placeholder = cfg.ph;
+      document.getElementById("f-kind-hint").textContent = cfg.hint;
+      document.getElementById("source-row").style.display = isMic ? "none" : "";
+      document.getElementById("btn-resolve").style.display = kind === "file" || isMic ? "none" : "";
+      document.getElementById("btn-create").disabled = isMic;
+      document.getElementById("btn-create").textContent = isMic ? "Usar captura de mic ↓" : "▶ Crear sesión";
+      if (kind === "file" || isMic) {
+        resolvedSource = null;
+        document.getElementById("resolve-info").style.display = "none";
+      }
+    }
+
+    // ---------------------------------------------------------------- resolve
+    async function resolveSource() {
+      const url = document.getElementById("f-source").value.trim();
+      if (!url) return;
+      const btn = document.getElementById("btn-resolve");
+      const info = document.getElementById("resolve-info");
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>';
+      info.style.display = "none";
+      resolvedSource = null;
+      try {
+        const res = await fetch("/api/resolve-source", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+        const data = await res.json();
+        resolvedSource = data.resolved;
+        if (data.warning) {
+          info.className = "resolve-badge warn";
+          info.textContent = "⚠ " + data.warning;
+        } else if (data.resolved !== data.original) {
+          info.className = "resolve-badge ok";
+          info.textContent = "✓ Resuelto: " + data.resolved.slice(0, 120) + (data.resolved.length > 120 ? "…" : "");
+        } else {
+          info.className = "resolve-badge";
+          info.textContent = "URL usada tal cual (no es YouTube o ya es directa).";
+        }
+        info.style.display = "block";
+      } catch (e) {
+        info.className = "resolve-badge";
+        info.textContent = "Error al resolver: " + e.message;
+        info.style.display = "block";
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Resolver";
+      }
+    }
+
+    // ---------------------------------------------------------------- create
+    async function createSession() {
+      if (document.getElementById("f-kind").value === "mic") {
+        showMsg("Para el mic usá el botón 🎙 Capturar micrófono (abajo).", "warn");
+        return;
+      }
+      const rawSource = document.getElementById("f-source").value.trim();
+      if (!rawSource) { showMsg("Ingresá una URL o ruta de fuente.", "err"); return; }
+      // Resolución en línea: si es una URL de YouTube aún sin resolver, la resolvemos acá
+      // (antes de Crear) para no depender del botón "Resolver".
+      if (!resolvedSource && /youtube\.com|youtu\.be/i.test(rawSource)) {
+        try {
+          const r = await (await fetch("/api/resolve-source", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: rawSource }),
+          })).json();
+          if (r.resolved && r.resolved !== rawSource) {
+            resolvedSource = r.resolved;
+            const info = document.getElementById("resolve-info");
+            info.className = "resolve-badge ok";
+            info.textContent = "✓ Auto-resuelto: " + r.resolved.slice(0, 120) + (r.resolved.length > 120 ? "…" : "");
+            info.style.display = "block";
+          } else if (r.warning) {
+            showMsg("Resolver: " + r.warning, "warn");
+          }
+        } catch (_e) { /* si falla la resolución, se usa la URL cruda y fallará con mensaje claro */ }
+      }
+      const source = resolvedSource || rawSource;
+      const isRemote = /^(https?:\/\/|rtmp:\/\/|rtsp:\/\/|udp:\/\/)/i.test(source);
+      if (isRemote && currentMode !== "live") {
+        showMsg("Modo DEMO reproduce solo samples locales (samples/*.wav). Para URLs o YouTube necesitás modo LIVE: PROVIDER=gemini + GEMINI_API_KEY.", "warn");
+        return;
+      }
+      const title = document.getElementById("f-title").value.trim();
+      const sid = document.getElementById("f-sid").value.trim() || null;
+      const srcLang = document.getElementById("f-src-lang").value;
+      const tgtLang = document.getElementById("f-tgt-lang").value;
+
+      const btn = document.getElementById("btn-create");
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Creando…';
+      showMsg("", "");
+
+      try {
+        const res = await fetch("/api/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            source,
+            session_id: sid || undefined,
+            title: title || undefined,
+            source_lang: srcLang,
+            target_langs: [tgtLang, srcLang].filter((l, i, a) => a.indexOf(l) === i),
+            auto_start: true,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showMsg("Error " + res.status + ": " + (data.detail || JSON.stringify(data)), "err");
+        } else {
+          showMsg("✓ Sesión creada: " + data.id, "ok");
+          // limpiar formulario
+          document.getElementById("f-source").value = "";
+          document.getElementById("f-title").value = "";
+          document.getElementById("f-sid").value = "";
+          document.getElementById("resolve-info").style.display = "none";
+          resolvedSource = null;
+          document.getElementById("new-session-details").removeAttribute("open");
+        }
+      } catch (e) {
+        showMsg("Error de red: " + e.message, "err");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "▶ Crear sesión";
+      }
+    }
+
+    // ---------------------------------------------------------------- captura
+    const capture = { ws: null, ctx: null, node: null, mic: null };
+    const capBtn = document.getElementById("btn-capture");
+    const capState = document.getElementById("capture-state");
+    const capLabel = document.getElementById("capture-label");
+    const vuBar = document.getElementById("vu-bar");
+    const vuText = document.getElementById("vu-text");
+
+    function slugify(s) { return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""); }
+    function setVU(rms) {
+      const db = 20 * Math.log10(Math.max(rms, 1e-4));
+      vuBar.style.width = Math.round(Math.min(1, rms * 6) * 100) + "%";
+      vuText.textContent = db.toFixed(1) + " dB";
+    }
+    function pcm16(floats) {
+      const buf = new DataView(new ArrayBuffer(floats.length * 2));
+      for (let i = 0; i < floats.length; i++) {
+        const s = Math.max(-1, Math.min(1, floats[i]));
+        buf.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+      }
+      return buf.buffer;
+    }
+    function resetCapBtn() {
+      capBtn.disabled = false;
+      capBtn.textContent = "🎙 Capturar micrófono";
+      capBtn.classList.remove("recording");
+      capState.style.display = "none";
+    }
+    function stopMic() {
+      if (capture.node) { try { capture.node.disconnect(); } catch (e) {} capture.node = null; }
+      if (capture.ctx) { try { capture.ctx.close(); } catch (e) {} capture.ctx = null; }
+      if (capture.mic) { capture.mic.getTracks().forEach((t) => t.stop()); capture.mic = null; }
+      setVU(0);
+    }
+    async function startMic(ws) {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error("getUserMedia no disponible.");
+      const mic = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
+      });
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new Ctx({ sampleRate: 16000 });
+      const src = ctx.createMediaStreamSource(mic);
+      const node = ctx.createScriptProcessor(4096, 1, 1);
+      node.onaudioprocess = (e) => {
+        const ch = e.inputBuffer.getChannelData(0);
+        let sum = 0;
+        for (let i = 0; i < ch.length; i += 16) sum += ch[i] * ch[i];
+        setVU(Math.sqrt(sum / (ch.length / 16)) || 0);
+        if (ws && ws.readyState === WebSocket.OPEN) ws.send(pcm16(ch));
+      };
+      src.connect(node);
+      capture.ctx = ctx; capture.node = node; capture.mic = mic;
+    }
+    function stopCapture() {
+      const ws = capture.ws;
+      capture.ws = null;
+      if (ws && ws.readyState === WebSocket.OPEN) ws.close(1000, "detenido por el operador");
+      stopMic();
+      resetCapBtn();
+    }
+    async function toggleCapture() {
+      if (capture.ws) { stopCapture(); return; }
+      const src = document.getElementById("f-src-lang").value;
+      const tgt = document.getElementById("f-tgt-lang").value;
+      const title = document.getElementById("f-title").value.trim() || "Sala en vivo";
+      const sid = document.getElementById("f-sid").value.trim() || slugify(title) || "sala-1";
+      const proto = location.protocol === "https:" ? "wss" : "ws";
+      const url = `${proto}://${location.host}/ws/audio/${encodeURIComponent(sid)}` +
+        `?source_lang=${encodeURIComponent(src)}&target_lang=${encodeURIComponent(tgt)}` +
+        `&title=${encodeURIComponent(title)}`;
+      let ws;
+      try { ws = new WebSocket(url); } catch (e) { showMsg("no se pudo abrir el WebSocket: " + e.message, "err"); return; }
+      capBtn.disabled = true;
+      capBtn.textContent = "Conectando…";
+      ws.onopen = async () => {
+        try {
+          await startMic(ws);
+          capture.ws = ws;
+          capLabel.textContent = `capturando «${sid}» · ${src} → ${tgt}`;
+          capState.style.display = "flex";
+          capBtn.textContent = "■ Detener captura";
+          capBtn.classList.add("recording");
+        } catch (e) {
+          showMsg("Mic: " + (e.name === "NotAllowedError" ? "permiso denegado" : e.message), "err");
+          ws.close();
+          resetCapBtn();
+        }
+      };
+      ws.onerror = () => { showMsg("Error de WebSocket de audio.", "err"); resetCapBtn(); };
+      ws.onclose = (ev) => {
+        stopMic();
+        capture.ws = null;
+        resetCapBtn();
+        if (ev.code !== 1000 && ev.code !== 1005) {
+          showMsg(`Captura terminada (${ev.code}): ${ev.reason || "sin motivo"}`, ev.code === 1008 ? "err" : "warn");
+        }
+      };
+    }
+
+    // ---------------------------------------------------------------- QR
+    function showQR() {
+      const url = location.origin + "/";
+      document.getElementById("qr-url").textContent = url;
+      const el = document.getElementById("qr-svg");
+      el.innerHTML = "";
+      const qr = qrcode(0, "M");
+      qr.addData(url);
+      qr.make();
+      el.innerHTML = qr.createSvgTag(6, 2);
+      document.getElementById("qr-overlay").classList.add("open");
+    }
+    function closeQR() { document.getElementById("qr-overlay").classList.remove("open"); }
+    async function copyQR() {
+      const url = document.getElementById("qr-url").textContent;
+      try { await navigator.clipboard.writeText(url); showMsg("URL copiada al portapapeles.", "ok"); }
+      catch (e) { window.prompt("Copiá esta URL:", url); }
+    }
+
+    // ---------------------------------------------------------------- stop
+    async function stopSession(sid) {
+      if (!confirm(`¿Detener la sesión "${sid}"?`)) return;
+      try {
+        const res = await fetch(`/api/sessions/${encodeURIComponent(sid)}`, { method: "DELETE" });
+        if (!res.ok) {
+          const d = await res.json();
+          alert("Error: " + (d.detail || res.status));
+        }
+      } catch (e) {
+        alert("Error de red: " + e.message);
+      }
+    }
+
+    // ---------------------------------------------------------------- tick
     async function tick() {
       try {
         const res = await fetch("/api/sessions");
         const p = await res.json();
         badgeEl.textContent = p.mode === "live" ? "● LIVE — Gemini" : "● DEMO — Replay";
         badgeEl.className = p.mode === "live" ? "badge badge-live" : "badge badge-demo";
+        currentMode = p.mode;
+        if (p.mode !== "live" && !capture.ws) {
+          capBtn.disabled = true;
+          capBtn.title = "La captura del mic requiere PROVIDER=gemini (modo LIVE).";
+        } else if (!capture.ws) {
+          capBtn.disabled = false;
+          capBtn.title = "";
+        }
         tbody.innerHTML = "";
         for (const s of p.sessions) {
           const m = s.metrics || {};
           const p50 = m.p50_ms || {}, p95 = m.p95_ms || {};
           const tr = document.createElement("tr");
+          let stTxt, stCls;
+          if (s.status === "error") {
+            stCls = "error";
+            stTxt = /429|RESOURCE_EXHAUSTED/.test(s.error || "") ? "⚠ cuota 429" : s.status;
+          } else if (s.status === "running" && (s.segments || 0) === 0) {
+            stCls = "ok";
+            stTxt = "transcribiendo…";
+          } else {
+            stCls = s.status === "running" ? "ok" : "stop";
+            stTxt = s.status;
+          }
           tr.innerHTML = `
             <td>${escapeHtml(s.id)}</td>
             <td>${escapeHtml(s.title)}</td>
-            <td>${escapeHtml(s.status)}</td>
+            <td class="pstatus ${stCls}">${escapeHtml(stTxt)}</td>
             <td>${s.mode}</td>
             <td class="num">${s.metrics.errors}</td>
             <td class="num">${s.metrics.reconnections}</td>
@@ -91,7 +644,13 @@
             ${cell(p95.translation)}
             ${cell(p50.pipeline)}
             ${cell(p95.pipeline)}
-            <td>${escapeHtml(s.error || "")}</td>`;
+            <td>${escapeHtml(s.error || "")}</td>
+            <td>
+              <a href="/" target="_blank" title="Ver subtítulos">◉</a>
+              ${s.capturing ? '<span class="cap-dot" title="capturando mic en vivo"></span>' : ""}
+              <button class="btn-danger" onclick="showQR()">◇ QR</button>
+              <button class="btn-danger" onclick="stopSession('${escapeHtml(s.id)}')">■ Stop</button>
+            </td>`;
           tbody.appendChild(tr);
         }
         document.getElementById("foot-status").textContent =
@@ -100,13 +659,9 @@
         document.getElementById("foot-status").textContent = "API no disponible: " + e.message;
       }
     }
-    function escapeHtml(s) {
-      return String(s).replace(/[&<>"']/g, (c) => ({
-        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-      }[c]));
-    }
     tick();
     setInterval(tick, 2500);
+    updateKind();
   </script>
 </body>
 </html>

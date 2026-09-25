@@ -10,7 +10,10 @@ from app.models import WireEvent
 
 
 def wire(sid: str, kind: str, lang: str, text: str, seq: int = 0) -> WireEvent:
-    return WireEvent(session_id=sid, kind=kind, lang=lang, text=text, is_final=kind != "partial")
+    return WireEvent(
+        session_id=sid, kind=kind, lang=lang, text=text,
+        is_final=kind != "partial", start_ms=0, end_ms=0,
+    )
 
 
 @pytest.fixture

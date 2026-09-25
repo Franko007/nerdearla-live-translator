@@ -1,16 +1,53 @@
-"""Transcripción en vivo con Gemini Live API.
+"""Transcripción en vivo con Gemini Live API (o por chunks vía AI Studio).
 
 Convierte los eventos específicos de Gemini (server_content/input_transcription)
 al formato normalizado del proyecto (TranscriptEvent).
+
+Modo por chunks (fallback sin billing):
+  - No usa la Live API; parte el audio en ventanas y llama generate_content.
+  - Funciona en AI Studio con GEMINI_API_KEY (y también en Vertex si hay 3.x).
+  - Más latente, pero no requiere billing de GCP.
 """
 from __future__ import annotations
 
 import asyncio
+import io
+import random
 import time
+import wave
 from typing import AsyncIterator
 
 from app.audio.ffmpeg import SAMPLE_RATE
 from app.models import TranscriptEvent
+
+# Fallback: ventana de audio por llamada y prompt de transcripción por chunks.
+CHUNK_MS = 4000
+CHUNK_PROMPT = "Transcribe verbatim the speech in the audio. Output only the transcribed text, no commentary."
+
+RETRYABLE = {"429", "500", "503", "504"}
+
+
+async def _call_with_retry(coro_factory, attempts: int = 4):
+    """Ejecuta `coro_factory()` con backoff exp. + jitter ante 429/5xx.
+
+    Las cuentas promocionales de Vertex tienen cuotas por minuto: un 429 es
+    transitorio y conviene esperar a que se reponga y seguir, no matar la sesión.
+    """
+    delay = 1.0
+    last: Exception | None = None
+    for n in range(attempts):
+        try:
+            return await coro_factory()
+        except Exception as e:  # noqa: BLE001
+            last = e
+            code = str(getattr(e, "code", "") or "")
+            status = str(getattr(e, "status", "") or "").upper()
+            retryable = bool({code, status} & RETRYABLE) or "RESOURCE_EXHAUSTED" in str(e)
+            if not retryable or n == attempts - 1:
+                raise
+            await asyncio.sleep(delay * (0.8 + random.random() * 0.4))
+            delay *= 2
+    raise last  # pragma: no cover
 
 
 def build_gemini_client(settings):
@@ -21,7 +58,8 @@ def build_gemini_client(settings):
     import google.genai as genai
 
     if settings.google_genai_use_vertexai:
-        return genai.VertexAI(
+        return genai.Client(
+            vertexai=True,
             project=settings.google_cloud_project,
             location=settings.google_cloud_location,
         )
@@ -32,13 +70,57 @@ def build_gemini_client(settings):
     )
 
 
+# Nombres que difieren entre AI Studio y Vertex AI (backend del proyecto).
+_VERTEX_RENAME = {
+    "gemini-3.5-transcribe-live": "gemini-3.5-transcribe-live-preview",
+}
+
+
+class _Disconnected(Exception):
+    """Señal interna: la sesión live cayó y hay que reconectar con backoff."""
+
+
+def backend_model(settings, short_name: str) -> str:
+    """Convierte el nombre corto al nombre real del backend (Vertex usa ruta completa)."""
+    if not settings.google_genai_use_vertexai:
+        return short_name
+    name = _VERTEX_RENAME.get(short_name, short_name)
+    return f"publishers/google/models/{name}"
+
+
+def transcribe_model_for(settings, chunked: bool) -> str:
+    """Modelo accesible para transcripción según backend y modo.
+
+    En este proyecto Vertex solo habilita la generación 2.x (las 3.x y los
+    transcribe-*-live devuelven 404 "no access" / 1008 vacío), así que el modo
+    chunked usa por defecto `gemini-2.5-flash-lite` (validado transcribiendo
+    audio). En AI Studio el live sin billing no emite eventos: se usa
+    `gemini-3.5-flash-lite` por `generate_content`. `TRANSCRIBE_CHUNK_MODEL`
+    permite forzar otro.
+    """
+    if not chunked:
+        return backend_model(settings, settings.transcribe_model)
+    short = (settings.transcribe_chunk_model or "").strip()
+    if settings.google_genai_use_vertexai:
+        if not short:
+            short = "gemini-2.5-flash-lite"
+        if short.startswith("publishers/"):
+            return short
+        return f"publishers/google/models/{short}"
+    if not short:
+        short = "gemini-3.5-flash-lite"
+    return short
+
+
 class GeminiTranscriber:
     GRACE_AFTER_AUDIO_S = 6.0
 
-    def __init__(self, model: str, source_lang: str, *, client) -> None:
+    def __init__(self, model: str, source_lang: str, *, client, chunked: bool = False, chunk_ms: int = CHUNK_MS) -> None:
         self.model = model
         self.source_lang = source_lang
         self._client = client
+        self.chunked = chunked
+        self.chunk_ms = chunk_ms
         self.connected = False
         self.reconnections = 0
         self.error: str | None = None
@@ -70,52 +152,72 @@ class GeminiTranscriber:
     async def stream(self, audio: AsyncIterator[bytes]) -> AsyncIterator[TranscriptEvent]:
         """Consume audio PCM y emite TranscriptEvent normalizados.
 
-        Reintenta la conexión con backoff 1s -> 2s -> 4s -> 8s y retoma el
-        audio desde donde quedó. Un fallo de una sesión no afecta a las demás.
+        En modo `chunked` (fallback sin billing) el audio se transcribe por
+        ventanas con generate_content; si no, se usa la Live API con
+        reconexión con backoff 1s -> 2s -> 4s -> 8s y retoma del audio donde
+        quedó. Un fallo de una sesión no afecta a las demás. Cuando el audio ya
+        se agotó, corta la reconexión y termina.
         """
+        if self.chunked:
+            async for ev in self.stream_chunked(audio):
+                yield ev
+            return
+
         delay = 1.0
         while not self._closed:
             self.connected = True
             self.error = None
-            async with self._client.aio.live.connect(model=self.model, config=self._connect_config()) as session:
-                send = asyncio.create_task(self._send(session, audio))
-                try:
-                    drained_before_end = False
-                    while True:
-                        try:
-                            async for msg in session.receive():
-                                ev = self._normalize(msg)
-                                if ev is not None:
-                                    yield ev
-                        except asyncio.CancelledError:
-                            raise
-                        except Exception as e:
-                            self.error = f"{type(e).__name__}: {e}".split("\n")[0]
-                            self.connected = False
-                            raise _Disconnected from e
-
-                        await asyncio.sleep(0.02)
-                        if send.done():
-                            # Audio terminó: esperar/consumir eventos finales tardíos.
-                            if not drained_before_end:
-                                await asyncio.sleep(self.GRACE_AFTER_AUDIO_S)
-                                drained_before_end = True
-                                continue
-                            break
-                    break  # flujo normal terminado
-                except _Disconnected:
-                    self.reconnections += 1
-                    pass
-                finally:
-                    send.cancel()
+            send: asyncio.Task | None = None
+            try:
+                async with self._client.aio.live.connect(model=self.model, config=self._connect_config()) as session:
+                    send = asyncio.create_task(self._send(session, audio))
+                    it = session.receive()
+                    drained = False
                     try:
-                        await send
-                    except Exception:
-                        pass
-                if self._closed:
+                        while True:
+                            try:
+                                msg = await asyncio.wait_for(it.__anext__(), timeout=1.0)
+                            except asyncio.TimeoutError:
+                                if send.done():
+                                    if not drained:
+                                        await asyncio.sleep(self.GRACE_AFTER_AUDIO_S)
+                                        drained = True
+                                    else:
+                                        break
+                                continue
+                            except StopAsyncIteration:
+                                break
+                            except Exception as e:
+                                self.error = f"{type(e).__name__}: {e}".split("\n")[0]
+                                self.connected = False
+                                raise _Disconnected from e
+                            ev = self._normalize(msg)
+                            if ev is not None:
+                                yield ev
+                    finally:
+                        send.cancel()
+                        try:
+                            await send
+                        except (asyncio.CancelledError, Exception):
+                            pass
+                if not send.done():
+                    # El stream se cerró con audio en curso: el backend cortó la
+                    # sesión (a veces sin eventos). Hay que reconectar.
+                    self.connected = False
+                    self.error = "stream cerrado por el backend sin terminación"
+                    raise _Disconnected
+                break  # flujo normal terminado
+            except _Disconnected:
+                if send is not None and send.done():
+                    # El audio ya se envió entero: no hay nada más que mandar.
                     break
-                await asyncio.sleep(delay)
-                delay = min(delay * 2, 8.0)
+                self.reconnections += 1
+            if self._closed:
+                break
+            if self.connected:
+                break
+            await asyncio.sleep(delay)
+            delay = min(delay * 2, 8.0)
         self.connected = False
 
     async def _send(self, session, audio: AsyncIterator[bytes]) -> None:
@@ -149,6 +251,78 @@ class GeminiTranscriber:
             text=text,
             is_final=bool(finished),
             received_at=time.monotonic(),
+        )
+
+    # --------------------------------------------------------- modo chunks
+    def _window_bytes(self) -> int:
+        return int(SAMPLE_RATE * 2 * self.chunk_ms / 1000)
+
+    @staticmethod
+    def _pcm_to_wav(pcm: bytes) -> bytes:
+        """Envuelve PCM s16le mono al contenedor WAV que espera generate_content."""
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(SAMPLE_RATE)
+            w.writeframes(pcm)
+        return buf.getvalue()
+
+    async def stream_chunked(self, audio: AsyncIterator[bytes]) -> AsyncIterator[TranscriptEvent]:
+        """Parte el audio en ventanas de `chunk_ms` y transcribe cada una.
+
+        Emite un TranscriptEvent final por ventana con su rango de tiempo real
+        (start_ms/end_ms relativos al audio), que el Segmenter convierte en
+        segmento y traduce directo.
+        """
+        buf = bytearray()
+        window_bytes = self._window_bytes()
+        start_ms = 0
+        while not self._closed:
+            chunk = await anext(audio, b"")
+            if not chunk:
+                if buf:
+                    yield await self._transcribe_window(bytes(buf), start_ms)
+                break
+            buf += chunk
+            if len(buf) >= window_bytes:
+                yield await self._transcribe_window(bytes(buf), start_ms)
+                start_ms += self.chunk_ms
+                buf.clear()
+
+    def _chunk_prompt(self) -> str:
+        if self.source_lang and self.source_lang != "auto":
+            return f"{CHUNK_PROMPT}\nThe speech is in the language code: {self.source_lang}."
+        return CHUNK_PROMPT
+
+    async def _transcribe_window(self, pcm: bytes, start_ms: int) -> TranscriptEvent:
+        from google.genai import types
+
+        self.connected = True
+        media = types.Part.from_bytes(data=self._pcm_to_wav(pcm), mime_type="audio/wav")
+        prompt = types.Part(text=self._chunk_prompt())
+        try:
+            resp = await _call_with_retry(
+                lambda: self._client.aio.models.generate_content(
+                    model=self.model,
+                    contents=types.Content(role="user", parts=[media, prompt]),
+                )
+            )
+        except Exception as e:
+            self.connected = False
+            self.error = f"{type(e).__name__}: {e}".split("\n")[0]
+            raise
+        text = (resp.text or "").strip()
+        if not text:
+            self.error = "generate_content devolvió transcripción vacía."
+            text = ""
+        return TranscriptEvent(
+            text=text,
+            is_final=True,
+            start_ms=start_ms,
+            end_ms=start_ms + self.chunk_ms,
+            received_at=time.monotonic(),
+            audio_pos_ms=start_ms + self.chunk_ms,
         )
 
     async def close(self) -> None:

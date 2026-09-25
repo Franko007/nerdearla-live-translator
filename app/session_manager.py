@@ -14,6 +14,9 @@ from app.hub import Hub
 from app.session import Session
 
 
+_MAX_ID_LEN = 30
+
+
 class SessionManager:
     def __init__(self, settings: Settings, hub: Hub, glossary: list[str], client=None) -> None:
         self.settings = settings
@@ -80,6 +83,13 @@ class SessionManager:
         await session.stop()
         return True
 
+    async def remove(self, session_id: str) -> bool:
+        async with self._lock:
+            if session_id not in self.sessions:
+                return False
+            self.sessions.pop(session_id, None)
+            return True
+
     # ---------------------------------------------------------- auto discover
     def discover_samples(self) -> list[Session]:
         """Modo Replay: crea una sesión por cada samples/*.wav con su .replay.json."""
@@ -111,7 +121,7 @@ class SessionManager:
 
     # ---------------------------------------------------------------- helpers
     def _resolve_local_path(self, source: str) -> Path | None:
-        if source.startswith(("http://", "https://", "rtmp://", "rtsp://", "udp://")):
+        if source.startswith(("http://", "https://", "rtmp://", "rtsp://", "udp://", "mic://")):
             return None
         return Path(source)
 
@@ -121,8 +131,8 @@ class SessionManager:
             sid = re.sub(r"[^a-zA-Z0-9_-]", "-", session_id).strip("-")
             if not sid:
                 raise ValueError("session_id inválido.")
-            return sid
+            return sid[: _MAX_ID_LEN]
         base = re.sub(r"[^a-zA-Z0-9_-]", "-", title.lower()).strip("-")
         if not base:
             base = Path(source).stem or "session"
-        return base
+        return base[: _MAX_ID_LEN]
