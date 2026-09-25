@@ -62,6 +62,30 @@ def backend_model(settings, short_name: str) -> str:
     return f"publishers/google/models/{name}"
 
 
+def transcribe_model_for(settings, chunked: bool) -> str:
+    """Modelo accesible para transcripción según backend y modo.
+
+    En este proyecto Vertex solo habilita la generación 2.x (las 3.x y los
+    transcribe-*-live devuelven 404 "no access" / 1008 vacío), así que el modo
+    chunked usa por defecto `gemini-2.5-flash-lite` (validado transcribiendo
+    audio). En AI Studio el live sin billing no emite eventos: se usa
+    `gemini-3.5-flash-lite` por `generate_content`. `TRANSCRIBE_CHUNK_MODEL`
+    permite forzar otro.
+    """
+    if not chunked:
+        return backend_model(settings, settings.transcribe_model)
+    short = (settings.transcribe_chunk_model or "").strip()
+    if settings.google_genai_use_vertexai:
+        if not short:
+            short = "gemini-2.5-flash-lite"
+        if short.startswith("publishers/"):
+            return short
+        return f"publishers/google/models/{short}"
+    if not short:
+        short = "gemini-3.5-flash-lite"
+    return short
+
+
 class GeminiTranscriber:
     GRACE_AFTER_AUDIO_S = 6.0
 
@@ -254,7 +278,7 @@ class GeminiTranscriber:
         try:
             resp = await self._client.aio.models.generate_content(
                 model=self.model,
-                contents=types.Content(parts=[media, prompt]),
+                contents=types.Content(role="user", parts=[media, prompt]),
             )
         except Exception as e:
             self.connected = False

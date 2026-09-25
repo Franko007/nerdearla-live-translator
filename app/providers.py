@@ -9,7 +9,7 @@ from pathlib import Path
 
 from app.config import Settings
 from app.replay import load_replay, replay_path_for_audio
-from app.transcribers.gemini import GeminiTranscriber, backend_model
+from app.transcribers.gemini import GeminiTranscriber, transcribe_model_for
 from app.transcribers.replay import ReplayTranscriber
 from app.translators.gemini import GeminiTranslator
 from app.translators.replay import ReplayTranslator
@@ -19,7 +19,7 @@ def _translate_model(settings: Settings) -> str:
     """Modelo de traducción por backend.
 
     En este proyecto Vertex las generaciones 3.x no están habilitadas; se usa
-    2.5-flash (validado). AI Studio sigue con el configurado (flash-lite).
+    2.5-flash-lite (validado). AI Studio sigue con el configurado (flash-lite).
     """
     if not settings.google_genai_use_vertexai:
         return settings.translate_model
@@ -27,7 +27,7 @@ def _translate_model(settings: Settings) -> str:
     if name.startswith("publishers/"):
         return name
     if name.startswith("gemini-3") or not name:
-        name = "gemini-2.5-flash"
+        name = "gemini-2.5-flash-lite"
     return f"publishers/google/models/{name}"
 
 
@@ -45,8 +45,13 @@ def build_adapters(settings: Settings, session, glossary: list[str], client=None
             raise RuntimeError(f"No existe grabación de replay para {session.source}: {replay_path}")
         data = load_replay(replay_path)
         return ReplayTranscriber(data), ReplayTranslator(data), "demo"
+    # "auto" (default) = chunked: los transcribe-*-live no son accesibles en este
+    # proyecto (404 "no access" en Vertex / sin eventos en AI Studio). Live queda
+    # como opt-in explícito para cuentas con acceso.
+    chunked = settings.transcribe_mode != "live"
+    tr_model = transcribe_model_for(settings, chunked)
     return (
-        GeminiTranscriber(backend_model(settings, settings.transcribe_model), session.source_lang, client=client),
+        GeminiTranscriber(tr_model, session.source_lang, client=client, chunked=chunked),
         GeminiTranslator(_translate_model(settings), glossary, client=client),
         "live",
     )

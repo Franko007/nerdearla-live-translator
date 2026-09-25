@@ -18,7 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.config import Settings
-from app.transcribers.gemini import GeminiTranscriber, backend_model, build_gemini_client
+from app.transcribers.gemini import GeminiTranscriber, backend_model, build_gemini_client, transcribe_model_for
 
 SAMPLE_RATE = 16000
 CHUNK_BYTES = SAMPLE_RATE * 2 // 10  # 100 ms
@@ -44,18 +44,16 @@ async def main() -> None:
                          "(funciona sin billing; elige TRANSLATE_MODEL como motor)")
     args = ap.parse_args()
 
-    settings = Settings()
+settings = Settings()
     print(f"backend: vertex={settings.google_genai_use_vertexai} key={'si' if settings.gemini_api_key else 'no'}", flush=True)
     client = build_gemini_client(settings)
-    if args.chunked:
-        model = backend_model(settings, settings.translate_model)
-    else:
-        model = backend_model(settings, settings.transcribe_model)
-    print(f"model: {model} chunked={args.chunked}", flush=True)
+    chunked = args.chunked or settings.transcribe_mode != "live"
+    model = transcribe_model_for(settings, chunked) if chunked else backend_model(settings, settings.transcribe_model)
+    print(f"model: {model} chunked={chunked}", flush=True)
     pcm = load_pcm(args.audio)
     print(f"audio: {args.audio} ({len(pcm) // (SAMPLE_RATE * 2):.1f}s)", flush=True)
 
-    tr = GeminiTranscriber(model, settings.source_lang_default, client=client, chunked=args.chunked)
+    tr = GeminiTranscriber(model, settings.source_lang_default, client=client, chunked=chunked)
     t0 = time.monotonic()
     n = 0
     try:

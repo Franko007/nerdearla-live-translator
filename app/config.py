@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     google_cloud_location: str = "global"
     transcribe_model: str = "gemini-3.5-transcribe-live"
     translate_model: str = "gemini-3.5-flash-lite"
+    transcribe_mode: str = "auto"        # "auto" | "live" | "chunked"
+    transcribe_chunk_model: str = ""     # modelo para chunked (vacío = default por backend)
 
     # Demostración en vivo: HLS de Castr (Nerdearla)
     nerdearla_stream_url: str = ""
