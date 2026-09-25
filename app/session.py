@@ -55,10 +55,20 @@ class Session:
         self.transcriber = None
         self.translator = None
         self._source: FfmpegSource | None = None
+        self._stream = None          # WebSource (mic del navegador) si es captura en vivo
         self._task: asyncio.Task | None = None
         self._stopping = False
         self.audio_started: float | None = None
         self._replay_events: list[ReplayEvent] = []
+
+    @property
+    def capturing(self) -> bool:
+        """True cuando hay un mic de navegador alimentando la sesión."""
+        return self._stream is not None and not self._stream.closed
+
+    def attach_stream(self, stream) -> None:
+        """Adjunta una fuente externa (WebSource) que reemplaza a FfmpegSource."""
+        self._stream = stream
 
     # ------------------------------------------------------------------ utils
     def audio_clock_ms(self) -> int | None:
@@ -87,6 +97,7 @@ class Session:
             "source_lang": self.source_lang,
             "target_langs": self.target_langs,
             "source": self.source,
+            "capturing": self.capturing,
             "error": self.error,
             "created_at": self.created_at,
             "segments": len(self.segments),
@@ -110,6 +121,8 @@ class Session:
                 pass
         if self._source is not None:
             await self._source.close()
+        if self._stream is not None:
+            self._stream.close()
         if self.status in ("created", "starting", "running"):
             self.status = "stopped"
 
@@ -132,9 +145,13 @@ class Session:
                 origin_s=self.audio_started,
             )
             self.segments = segmenter.segments
-            self._source = FfmpegSource(self.source)
+            if self._stream is not None:
+                audio_iter = self._stream.chunks()
+            else:
+                self._source = FfmpegSource(self.source)
+                audio_iter = self._source.chunks()
             log.info("sesión %s: iniciando pipeline (%s)", self.id, mode)
-            async for ev in transcriber.stream(self._source.chunks()):
+            async for ev in transcriber.stream(audio_iter):
                 if self._stopping:
                     break
                 ev.audio_pos_ms = self.audio_clock_ms()

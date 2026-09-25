@@ -35,7 +35,7 @@ def test_srt_format():
     out = render_srt(segs(), "es")
     assert out == (
         "1\n00:00:00,100 --> 00:00:02,500\nHola.\n\n"
-        "2\n00:00:03,000 --> 00:00:05,400\nNos vemos.\n\n"
+        "2\n00:00:03,000 --> 00:00:05,400\nNos vemos.\n"
     )
 
 
@@ -52,9 +52,10 @@ def test_txt_format():
 
 
 def test_fallback_when_translation_missing():
-    (out,) = render_srt([segs()[0]], "de").splitlines()
     # lang 'de' no existe -> usa source_text
-    assert "Hello there." in render_srt(segs(), "de")
+    out = render_srt([segs()[0]], "de")
+    assert "Hello there." in out
+    assert "Hola." not in out
 
 
 def test_pct():

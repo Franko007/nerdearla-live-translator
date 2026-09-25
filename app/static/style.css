@@ -189,6 +189,7 @@ table.admin tr:hover td { background: var(--panel-2); }
 .admin-title h2 { margin-bottom: 4px; }
 .admin-title p { color: var(--muted); font-size: 13px; }
 .nan { color: #56627a; }
+.warn { color: var(--warn); }
 
 /* ------------------------------- overlay ------------------------------- */
 body.overlay {

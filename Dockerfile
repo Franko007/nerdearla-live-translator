@@ -6,7 +6,8 @@ WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy PYTHONUNBUFFERED=1
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg \
+    && apt-get install -y --no-install-recommends ffmpeg curl python3-pip \
+    && pip3 install --no-cache-dir yt-dlp \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml uv.lock ./

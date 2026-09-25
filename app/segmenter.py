@@ -70,6 +70,7 @@ class Segmenter:
             translated = await self.translator.translate(seg.source_text, target)
             dt_ms = (time.monotonic() - t0) * 1000
             seg.translations[target] = translated
+            out.append(self._wire("translation", target, translated, True, start_ms, end_ms))
             self.metrics.translation_ms.append(dt_ms)
             self.metrics.translation_calls += 1
             if seg.audio_pos_ms_at_close:

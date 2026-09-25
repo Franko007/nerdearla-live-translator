@@ -80,6 +80,13 @@ class SessionManager:
         await session.stop()
         return True
 
+    async def remove(self, session_id: str) -> bool:
+        async with self._lock:
+            if session_id not in self.sessions:
+                return False
+            self.sessions.pop(session_id, None)
+            return True
+
     # ---------------------------------------------------------- auto discover
     def discover_samples(self) -> list[Session]:
         """Modo Replay: crea una sesión por cada samples/*.wav con su .replay.json."""
@@ -111,7 +118,7 @@ class SessionManager:
 
     # ---------------------------------------------------------------- helpers
     def _resolve_local_path(self, source: str) -> Path | None:
-        if source.startswith(("http://", "https://", "rtmp://", "rtsp://", "udp://")):
+        if source.startswith(("http://", "https://", "rtmp://", "rtsp://", "udp://", "mic://")):
             return None
         return Path(source)
 
