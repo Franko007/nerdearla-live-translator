@@ -24,8 +24,28 @@ def is_youtube_url(url: str) -> bool:
 
 
 def _resolve_sync(url: str) -> str:
-    """Llama a yt-dlp en el proceso actual (bloqueante). Usa el mejor formato de audio."""
-    import subprocess
+    """Devuelve la URL directa de audio con yt-dlp (módulo Python; si no, CLI)."""
+    try:
+        import yt_dlp  # noqa: PLC0415
+
+        opts = {
+            "format": "bestaudio/best",
+            "noplaylist": True,
+            "quiet": True,
+            "no_warnings": True,
+            "skip_download": True,
+        }
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+        direct_url = _best_audio_url(info)
+        if direct_url:
+            return direct_url
+        raise RuntimeError("yt-dlp no devolvió ninguna URL de audio.")
+    except ImportError:
+        pass
+
+    if shutil.which("yt-dlp") is None:
+        raise RuntimeError("yt-dlp no está instalado (módulo Python) ni se encontró el binario 'yt-dlp'.")
     cmd = [
         "yt-dlp",
         "--no-playlist",
@@ -43,17 +63,25 @@ def _resolve_sync(url: str) -> str:
     return direct_url
 
 
+def _best_audio_url(info: dict) -> str | None:
+    """Elige el formato de audio de `info['formats']` (o el url directo)."""
+    if info is None:
+        return None
+    formats = info.get("formats") or []
+    audio = [f for f in formats if f.get("acodec") not in (None, "none")]
+    audio.sort(key=lambda f: (f.get("abr") or 0), reverse=True)
+    chosen = audio[0] if audio else (formats[-1] if formats else info)
+    return chosen.get("url")
+
+
 async def resolve_source(url: str) -> tuple[str, str | None]:
     """Devuelve (url_resuelta, advertencia|None).
 
-    Si es una URL de YouTube, la resuelve con yt-dlp.
-    Si yt-dlp no está instalado, devuelve la URL original con una advertencia.
+    Si es una URL de YouTube, la resuelve con yt-dlp (módulo Python o binario).
+    Si yt-dlp no está disponible, devuelve la URL original con una advertencia.
     """
     if not is_youtube_url(url):
         return url, None
-
-    if shutil.which("yt-dlp") is None:
-        return url, "yt-dlp no está instalado; intentando con la URL directa de YouTube (puede fallar)."
 
     log.info("Resolviendo URL de YouTube con yt-dlp: %s", url)
     loop = asyncio.get_event_loop()

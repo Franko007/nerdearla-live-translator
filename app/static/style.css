@@ -59,6 +59,26 @@ body {
 .badge-live { background: rgba(255, 45, 85, 0.14); color: #ff7b95; border: 1px solid rgba(255, 77, 109, 0.6); }
 .badge-demo { background: rgba(49, 208, 124, 0.12); color: var(--ok); border: 1px solid rgba(49, 208, 124, 0.55); }
 .desc { color: var(--muted); font-size: 12px; }
+.admin-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #ffffff;
+  background: #233450;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 7px 14px;
+  text-decoration: none;
+  white-space: nowrap;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.45);
+  transition: border-color .15s, box-shadow .15s;
+}
+.admin-link:hover { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.admin-link .admin-gear { font-size: 15px; }
+.admin-link .admin-txt { display: flex; flex-direction: column; line-height: 1.25; }
+.admin-link small { font-size: 10.5px; color: #b9c7da; font-weight: 600; letter-spacing: .3px; text-shadow: 0 0 6px rgba(255, 255, 255, 0.3); }
 
 /* ------------------------------- monitors ------------------------------ */
 .monitors {

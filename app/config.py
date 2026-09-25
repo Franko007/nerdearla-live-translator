@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+from app.transcribers.gemini import CHUNK_MS
+
 load_dotenv()
 
 
@@ -34,6 +36,7 @@ class Settings(BaseSettings):
     translate_model: str = "gemini-3.5-flash-lite"
     transcribe_mode: str = "auto"        # "auto" | "live" | "chunked"
     transcribe_chunk_model: str = ""     # modelo para chunked (vacío = default por backend)
+    transcribe_chunk_ms: int = CHUNK_MS   # ventana del modo chunked
 
     # Demostración en vivo: HLS de Castr (Nerdearla)
     nerdearla_stream_url: str = ""

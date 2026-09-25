@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import random
 import time
 import wave
 from typing import AsyncIterator
@@ -22,6 +23,31 @@ from app.models import TranscriptEvent
 # Fallback: ventana de audio por llamada y prompt de transcripción por chunks.
 CHUNK_MS = 4000
 CHUNK_PROMPT = "Transcribe verbatim the speech in the audio. Output only the transcribed text, no commentary."
+
+RETRYABLE = {"429", "500", "503", "504"}
+
+
+async def _call_with_retry(coro_factory, attempts: int = 4):
+    """Ejecuta `coro_factory()` con backoff exp. + jitter ante 429/5xx.
+
+    Las cuentas promocionales de Vertex tienen cuotas por minuto: un 429 es
+    transitorio y conviene esperar a que se reponga y seguir, no matar la sesión.
+    """
+    delay = 1.0
+    last: Exception | None = None
+    for n in range(attempts):
+        try:
+            return await coro_factory()
+        except Exception as e:  # noqa: BLE001
+            last = e
+            code = str(getattr(e, "code", "") or "")
+            status = str(getattr(e, "status", "") or "").upper()
+            retryable = bool({code, status} & RETRYABLE) or "RESOURCE_EXHAUSTED" in str(e)
+            if not retryable or n == attempts - 1:
+                raise
+            await asyncio.sleep(delay * (0.8 + random.random() * 0.4))
+            delay *= 2
+    raise last  # pragma: no cover
 
 
 def build_gemini_client(settings):
@@ -276,9 +302,11 @@ class GeminiTranscriber:
         media = types.Part.from_bytes(data=self._pcm_to_wav(pcm), mime_type="audio/wav")
         prompt = types.Part(text=self._chunk_prompt())
         try:
-            resp = await self._client.aio.models.generate_content(
-                model=self.model,
-                contents=types.Content(role="user", parts=[media, prompt]),
+            resp = await _call_with_retry(
+                lambda: self._client.aio.models.generate_content(
+                    model=self.model,
+                    contents=types.Content(role="user", parts=[media, prompt]),
+                )
             )
         except Exception as e:
             self.connected = False

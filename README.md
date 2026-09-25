@@ -265,6 +265,7 @@ Si el billing estuviera caído, simplemente:
 | `TRANSLATE_MODEL` | `gemini-3.5-flash-lite` | Modelo de traducción |
 | `TRANSCRIBE_MODE` | `auto` | `auto`(=chunked) / `chunked` / `live` |
 | `TRANSCRIBE_CHUNK_MODEL` | — | Modelo del modo ventanas (vacío = 2.5-lite en Vertex / 3.5-lite en AI Studio) |
+| `TRANSCRIBE_CHUNK_MS` | `4000` | Duración de la ventana del modo chunked (baja latencia vs. menos llamadas) |
 | `NERDEARLA_STREAM_URL` | — | HLS `.m3u8` a transcribir (en modo live) |
 | `SOURCE_LANG_DEFAULT` | `en` | Idioma del audio |
 | `TARGET_LANGS` | `es,en` | Idiomas a los que traducir (CSV) |

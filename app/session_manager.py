@@ -14,6 +14,9 @@ from app.hub import Hub
 from app.session import Session
 
 
+_MAX_ID_LEN = 30
+
+
 class SessionManager:
     def __init__(self, settings: Settings, hub: Hub, glossary: list[str], client=None) -> None:
         self.settings = settings
@@ -128,8 +131,8 @@ class SessionManager:
             sid = re.sub(r"[^a-zA-Z0-9_-]", "-", session_id).strip("-")
             if not sid:
                 raise ValueError("session_id inválido.")
-            return sid
+            return sid[: _MAX_ID_LEN]
         base = re.sub(r"[^a-zA-Z0-9_-]", "-", title.lower()).strip("-")
         if not base:
             base = Path(source).stem or "session"
-        return base
+        return base[: _MAX_ID_LEN]

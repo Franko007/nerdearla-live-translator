@@ -51,7 +51,10 @@ def build_adapters(settings: Settings, session, glossary: list[str], client=None
     chunked = settings.transcribe_mode != "live"
     tr_model = transcribe_model_for(settings, chunked)
     return (
-        GeminiTranscriber(tr_model, session.source_lang, client=client, chunked=chunked),
+        GeminiTranscriber(
+            tr_model, session.source_lang, client=client,
+            chunked=chunked, chunk_ms=settings.transcribe_chunk_ms,
+        ),
         GeminiTranslator(_translate_model(settings), glossary, client=client),
         "live",
     )

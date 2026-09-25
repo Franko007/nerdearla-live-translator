@@ -167,7 +167,7 @@ def create_app(settings: Settings | None = None, *, _entrypoint: bool = False) -
         params = websocket.query_params
         source_lang = params.get("source_lang") or settings.source_lang_default
         target_lang = params.get("target_lang")
-        title = params.get("title") or session_id
+        title = (params.get("title") or session_id)[:30]
 
         await websocket.accept()
         stream = WebSource()

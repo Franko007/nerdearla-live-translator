@@ -151,26 +151,36 @@
   <details class="new-session-card" id="new-session-details">
     <summary>＋ Nueva sesión</summary>
     <div class="form-body">
-      <div class="resolve-row">
+      <div class="field">
+        <label>Fuente</label>
+        <select id="f-kind" onchange="updateKind()">
+          <option value="youtube" selected>YouTube (video o live)</option>
+          <option value="url">URL de stream (HLS / directo)</option>
+          <option value="file">Archivo de audio (samples/*.wav)</option>
+          <option value="mic">Micrófono en vivo (sin URL)</option>
+        </select>
+      </div>
+      <div class="resolve-row" id="source-row">
         <div class="field field-full">
-          <label>URL de fuente</label>
-          <input id="f-source" type="url"
-            placeholder="https://youtube.com/watch?v=… · https://…/stream.m3u8 · samples/talk-en-1.wav" />
+          <label id="f-source-label">URL del video/live</label>
+          <input id="f-source" type="text"
+            placeholder="https://www.youtube.com/watch?v=…" />
         </div>
         <button class="btn btn-secondary" id="btn-resolve" onclick="resolveSource()" title="Resolver URL de YouTube con yt-dlp">
           Resolver
         </button>
       </div>
       <div id="resolve-info" class="resolve-badge" style="display:none"></div>
+      <p id="f-kind-hint" style="margin:0; font-size:11.5px; color:var(--muted)"></p>
 
       <div class="form-row">
         <div class="field">
-          <label>Título (opcional)</label>
-          <input id="f-title" type="text" placeholder="Ej: Charla principal · YouTube Demo" />
+          <label>Título (opcional, máx 30)</label>
+          <input id="f-title" type="text" maxlength="30" placeholder="Ej: Charla principal · YouTube Demo" />
         </div>
         <div class="field">
-          <label>ID de sesión (opcional)</label>
-          <input id="f-sid" type="text" placeholder="auto generado" />
+          <label>ID de sesión (opcional, máx 30)</label>
+          <input id="f-sid" type="text" maxlength="30" placeholder="auto generado" />
         </div>
       </div>
 
@@ -298,6 +308,46 @@
       el.className = "form-msg " + type;
     }
 
+    // ---------------------------------------------------------------- fuente
+    const KIND = {
+      youtube: {
+        label: "URL del video/live",
+        ph: "https://www.youtube.com/watch?v=…",
+        hint: "Se resuelve solo con yt-dlp al crear. Un video termina solo; un live queda corriendo hasta Stop.",
+      },
+      url: {
+        label: "URL del stream (HLS / directo)",
+        ph: "https://…/playlist.m3u8",
+        hint: "URL directa, normalmente HLS (.m3u8) o la directa que devolvió yt-dlp.",
+      },
+      file: {
+        label: "Archivo de audio en el server",
+        ph: "samples/talk-en-1.wav",
+        hint: "Ruta local al audio, p. ej. samples/talk-en-1.wav. Se procesa una sola vez.",
+      },
+      mic: {
+        label: "Micrófono en vivo",
+        ph: "",
+        hint: "Sin URL: apretá 🎙 Capturar micrófono abajo. Se crea la sesión sola y se corta al dejar de hablar.",
+      },
+    };
+    function updateKind() {
+      const kind = document.getElementById("f-kind").value;
+      const cfg = KIND[kind];
+      const isMic = kind === "mic";
+      document.getElementById("f-source-label").textContent = cfg.label;
+      document.getElementById("f-source").placeholder = cfg.ph;
+      document.getElementById("f-kind-hint").textContent = cfg.hint;
+      document.getElementById("source-row").style.display = isMic ? "none" : "";
+      document.getElementById("btn-resolve").style.display = kind === "file" || isMic ? "none" : "";
+      document.getElementById("btn-create").disabled = isMic;
+      document.getElementById("btn-create").textContent = isMic ? "Usar captura de mic ↓" : "▶ Crear sesión";
+      if (kind === "file" || isMic) {
+        resolvedSource = null;
+        document.getElementById("resolve-info").style.display = "none";
+      }
+    }
+
     // ---------------------------------------------------------------- resolve
     async function resolveSource() {
       const url = document.getElementById("f-source").value.trim();
@@ -339,8 +389,32 @@
 
     // ---------------------------------------------------------------- create
     async function createSession() {
+      if (document.getElementById("f-kind").value === "mic") {
+        showMsg("Para el mic usá el botón 🎙 Capturar micrófono (abajo).", "warn");
+        return;
+      }
       const rawSource = document.getElementById("f-source").value.trim();
       if (!rawSource) { showMsg("Ingresá una URL o ruta de fuente.", "err"); return; }
+      // Resolución en línea: si es una URL de YouTube aún sin resolver, la resolvemos acá
+      // (antes de Crear) para no depender del botón "Resolver".
+      if (!resolvedSource && /youtube\.com|youtu\.be/i.test(rawSource)) {
+        try {
+          const r = await (await fetch("/api/resolve-source", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: rawSource }),
+          })).json();
+          if (r.resolved && r.resolved !== rawSource) {
+            resolvedSource = r.resolved;
+            const info = document.getElementById("resolve-info");
+            info.className = "resolve-badge ok";
+            info.textContent = "✓ Auto-resuelto: " + r.resolved.slice(0, 120) + (r.resolved.length > 120 ? "…" : "");
+            info.style.display = "block";
+          } else if (r.warning) {
+            showMsg("Resolver: " + r.warning, "warn");
+          }
+        } catch (_e) { /* si falla la resolución, se usa la URL cruda y fallará con mensaje claro */ }
+      }
       const source = resolvedSource || rawSource;
       const isRemote = /^(https?:\/\/|rtmp:\/\/|rtsp:\/\/|udp:\/\/)/i.test(source);
       if (isRemote && currentMode !== "live") {
@@ -543,10 +617,21 @@
           const m = s.metrics || {};
           const p50 = m.p50_ms || {}, p95 = m.p95_ms || {};
           const tr = document.createElement("tr");
+          let stTxt, stCls;
+          if (s.status === "error") {
+            stCls = "error";
+            stTxt = /429|RESOURCE_EXHAUSTED/.test(s.error || "") ? "⚠ cuota 429" : s.status;
+          } else if (s.status === "running" && (s.segments || 0) === 0) {
+            stCls = "ok";
+            stTxt = "transcribiendo…";
+          } else {
+            stCls = s.status === "running" ? "ok" : "stop";
+            stTxt = s.status;
+          }
           tr.innerHTML = `
             <td>${escapeHtml(s.id)}</td>
             <td>${escapeHtml(s.title)}</td>
-            <td class="pstatus ${s.status === 'running' ? 'ok' : s.status === 'error' ? 'error' : 'stop'}">${escapeHtml(s.status)}</td>
+            <td class="pstatus ${stCls}">${escapeHtml(stTxt)}</td>
             <td>${s.mode}</td>
             <td class="num">${s.metrics.errors}</td>
             <td class="num">${s.metrics.reconnections}</td>
@@ -576,6 +661,7 @@
     }
     tick();
     setInterval(tick, 2500);
+    updateKind();
   </script>
 </body>
 </html>
